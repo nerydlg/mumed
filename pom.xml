@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>dev.nerydlg</groupId>
+    <artifactId>Mumed</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>22</maven.compiler.source>
+        <maven.compiler.target>22</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <jpackage.appVersion>0.1.0</jpackage.appVersion>
+        <jpackage.icon>${project.basedir}/src/main/resources/ico/mumied.png</jpackage.icon>
+        <jpackage.type>APP_IMAGE</jpackage.type>
+    </properties>
+    <dependencies>
+        <!-- Source: https://mvnrepository.com/artifact/net.jthink/jaudiotagger -->
+        <dependency>
+            <groupId>net.jthink</groupId>
+            <artifactId>jaudiotagger</artifactId>
+            <version>3.0.1</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>3.7.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>6.1.3</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.4</version>
+                <configuration>
+                    <!-- The tests use Swing models and ImageIO, but never open a window. -->
+                    <argLine>-Djava.awt.headless=true</argLine>
+                </configuration>
+            </plugin>
+            <plugin>
+                <!-- Builds a single runnable jar with jaudiotagger and FlatLaf inside, so "java -jar" just works. -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>dev.nerydlg.Main</mainClass>
+                                    <manifestEntries>
+                                        <!-- FlatLaf loads a native library for window decorations on some systems. -->
+                                        <Enable-Native-Access>ALL-UNNAMED</Enable-Native-Access>
+                                    </manifestEntries>
+                                </transformer>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <!-- Signatures from the libraries would no longer match the merged jar. -->
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+    <profiles>
+    <profile>
+        <!-- Builds a native app image via `mvn clean package -Pjpackage`.
+             jpackage only targets the OS it runs on, so this must be run
+             on each platform you want to distribute for. -->
+        <id>jpackage</id>
+        <build>
+            <plugins>
+                <plugin>
+                    <!-- jpackage bundles every jar in its input dir into the app image,
+                         so the shaded jar is staged in its own directory first - pointing
+                         input straight at target/ would recursively copy target/dist into itself. -->
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>stage-jpackage-input</id>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>copy-resources</goal>
+                            </goals>
+                            <configuration>
+                                <outputDirectory>${project.build.directory}/jpackage-input</outputDirectory>
+                                <resources>
+                                    <resource>
+                                        <directory>${project.build.directory}</directory>
+                                        <includes>
+                                            <include>${project.build.finalName}.jar</include>
+                                        </includes>
+                                    </resource>
+                                </resources>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.panteleyev</groupId>
+                    <artifactId>jpackage-maven-plugin</artifactId>
+                    <version>1.8.0</version>
+                    <configuration>
+                        <name>Mumed</name>
+                        <appVersion>${jpackage.appVersion}</appVersion>
+                        <vendor>nerydlg</vendor>
+                        <destination>${project.build.directory}/dist</destination>
+                        <removeDestination>true</removeDestination>
+                        <input>${project.build.directory}/jpackage-input</input>
+                        <mainJar>${project.build.finalName}.jar</mainJar>
+                        <mainClass>dev.nerydlg.Main</mainClass>
+                        <icon>${jpackage.icon}</icon>
+                        <type>${jpackage.type}</type>
+                        <addModules>
+                            <addModule>java.base</addModule>
+                            <addModule>java.compiler</addModule>
+                            <addModule>java.desktop</addModule>
+                            <addModule>java.management</addModule>
+                            <addModule>java.naming</addModule>
+                            <addModule>java.rmi</addModule>
+                            <addModule>java.scripting</addModule>
+                            <addModule>java.sql</addModule>
+                            <addModule>jdk.unsupported</addModule>
+                        </addModules>
+                        <jLinkOptions>
+                            <jLinkOption>--strip-debug</jLinkOption>
+                            <jLinkOption>--no-header-files</jLinkOption>
+                            <jLinkOption>--no-man-pages</jLinkOption>
+                            <jLinkOption>--compress=zip-9</jLinkOption>
+                        </jLinkOptions>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>jpackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+    </profiles>
+</project>
